@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEW YORK WILL BE OURS</title>
+<style>
+  :root{--bg:#0d0f12;--card:#15181e;--border:#252a33;--text:#e6e9ef;--muted:#8b93a7;--green:#3dd68c;--red:#f07178;--accent:#7aa2f7;--gold:#ffcb6b}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:transparent;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.4;padding:24px;min-height:100vh}
+  #bg{position:fixed;inset:0;z-index:-1;overflow:hidden;background:var(--bg)}
+  #bg video{width:100%;height:100%;object-fit:cover;filter:blur(16px) brightness(.4);transform:scale(1.1)}
+  .tabs{display:flex;gap:6px;justify-content:center;margin-top:14px}
+  .tabs a{color:var(--muted);text-decoration:none;padding:6px 14px;border-radius:6px;border:1px solid transparent;font-size:.9rem}
+  .tabs a.active{color:var(--accent);border-color:var(--border);background:rgba(21,24,30,.8)}
+  .search-box{position:relative}
+  #suggest{position:absolute;top:100%;left:0;margin-top:4px;min-width:100%;width:340px;z-index:20;background:#12151a;border:1px solid var(--border);border-radius:8px;overflow:hidden;display:none;box-shadow:0 8px 24px #000a}
+  .sg{display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;background:none;border:none;color:var(--text);cursor:pointer;text-align:left;font-size:.9rem}
+  .sg:hover,.sg.sel{background:#1e2430}
+  .sg .avatar{width:32px;height:32px;flex:none}
+  .sg-empty{padding:10px 12px;color:var(--muted);font-size:.85rem}
+  .rules{max-width:720px;margin:0 auto;padding:8px 36px 28px;background:rgba(13,15,18,.6);backdrop-filter:blur(8px);border-radius:14px}
+  .rules h2{font-size:.95rem;color:var(--accent);margin:26px 0 8px;text-align:center;text-transform:uppercase;letter-spacing:.14em;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  .rules p,.rules li{line-height:1.6}.rules p{margin:6px 0}
+  .rules ul{padding-left:22px;margin:6px 0}.rules li{margin:4px 0}
+  .rules .sub-h{font-weight:700;margin-top:10px}
+  .rules table{margin:6px auto 0;width:auto}.rules td{padding:5px 18px;background:none;border:none;color:var(--text);font-size:.95rem}
+  #audio{position:fixed;top:14px;right:16px;z-index:30;display:flex;align-items:center;gap:8px;background:rgba(18,21,26,.8);border:1px solid var(--border);border-radius:20px;padding:4px 12px 4px 6px;backdrop-filter:blur(6px)}
+  #audio button{background:none;border:none;font-size:1.15rem;cursor:pointer;color:var(--text);padding:2px 6px}
+  #audio input{width:90px;accent-color:var(--accent)}
+  .chip{display:block;width:fit-content;font-size:.72rem;padding:2px 9px;border-radius:10px;border:1px solid;margin:2px 0;white-space:nowrap}
+  .chip.ok{color:var(--green);border-color:#3dd68c66}.chip.bad{color:var(--red);border-color:#f0717866}.chip.warn{color:var(--gold);border-color:#ffcb6b66}
+  .hero{text-align:center;margin:6px 0 20px}
+  h1{display:inline-block;font-size:clamp(1.9rem,5.2vw,3.6rem);font-weight:900;letter-spacing:.16em;text-transform:uppercase;line-height:1.1;
+     background:linear-gradient(90deg,#ff6b6b,#feca57,#48dbfb,#ff6b6b);background-size:200% auto;animation:shine 8s linear infinite;
+     -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 2px 20px rgba(255,107,107,.35))}
+  @keyframes shine{to{background-position:200% center}}
+  .rule-line{width:min(420px,70%);height:2px;margin:10px auto 0;background:linear-gradient(90deg,transparent,#feca57,transparent);opacity:.7}
+  .controls{display:flex;gap:12px;margin:16px 0;flex-wrap:wrap;align-items:center}
+  .btn,.input{background:var(--card);border:1px solid var(--border);color:var(--text);padding:7px 14px;border-radius:6px;font-size:.85rem}
+  .btn{cursor:pointer}.btn:hover{border-color:var(--accent)}
+  .input{width:260px}
+  .muted{color:var(--muted);font-size:.8rem}
+  #status{margin:0 0 12px;padding:8px 12px;border-radius:6px;font-size:.85rem;display:none;background:#2a1a1d;border:1px solid var(--red);color:var(--red)}
+  .table-wrap{background:rgba(21,24,30,.82);backdrop-filter:blur(6px);border:1px solid var(--border);border-radius:10px;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:.9rem}
+  thead th{text-align:left;padding:12px 12px;color:var(--muted);font-weight:500;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);background:rgba(18,21,26,.9);white-space:nowrap}
+  thead th.sortable{cursor:pointer}thead th.sortable:hover,thead th.sorted{color:var(--accent)}
+  tbody tr{border-bottom:1px solid var(--border)}tbody tr:hover{background:#1a1e26}tbody tr:last-child{border-bottom:none}
+  td{padding:12px 12px;vertical-align:middle}
+  td:last-child{white-space:nowrap}
+  .rank-num{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px;font-weight:600;background:#1e2430}
+  tr.top-1 .rank-num{background:linear-gradient(135deg,#ffd700,#ffb700);color:#1a1200}
+  tr.top-2 .rank-num{background:linear-gradient(135deg,#c0c0c0,#a0a0a0);color:#1a1a1a}
+  tr.top-3 .rank-num{background:linear-gradient(135deg,#cd7f32,#a05a2c);color:#fff}
+  .player-cell{display:flex;align-items:center;gap:12px;min-width:190px}
+  .avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid var(--border);background:#2a3140;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+  .player-name{font-weight:600}.player-id{font-size:.75rem;color:var(--muted)}
+  .rank-badge{display:flex;align-items:center;gap:10px;min-width:170px}
+  .rank-img{width:44px;height:44px;object-fit:contain}
+  .badge-name{font-weight:600}.peak{font-size:.72rem;color:var(--gold)}
+  .gain{font-weight:700;font-size:1rem}.gain.up{color:var(--green)}.gain.down{color:var(--red)}.gain.flat{color:var(--muted)}
+  .sub{font-size:.75rem;color:var(--muted)}
+  .wr-bar{height:5px;background:#2a3140;border-radius:3px;overflow:hidden;margin-top:4px;width:90px}
+  .wr-fill{height:100%;background:linear-gradient(90deg,#3dd68c,#2ecc71)}
+  .heroes{display:flex;gap:10px}.hero-slot{display:flex;flex-direction:column;align-items:center;gap:3px;width:52px}
+  .hero-icon{width:36px;height:36px;border-radius:6px;object-fit:cover;border:1px solid #3a4150;background:#1e2430;display:flex;align-items:center;justify-content:center;font-size:.65rem;color:var(--muted)}
+  .hero-pct{font-size:.7rem;color:var(--muted)}
+  a.statlocker-btn{border:1px solid #5b6abf;color:#8b9bff;padding:5px 12px;border-radius:5px;font-size:.75rem;text-decoration:none;white-space:nowrap}
+  a.statlocker-btn:hover{background:#5b6abf22}
+  .x{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;padding:4px 8px}.x:hover{color:var(--red)}
+  .footer{margin-top:20px;font-size:.85rem;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+<div id="bg"><video src="mohammed_kareem.mp4" autoplay muted loop playsinline></video></div>
+<div id="audio"><button id="mute" title="Mute / unmute" aria-label="Mute or unmute">🔇</button><input id="vol" type="range" min="0" max="1" step="0.05" value="0.3" aria-label="Volume" /></div>
+<header class="hero"><h1>NEW YORK WILL BE OURS</h1><div class="rule-line"></div>
+<nav class="tabs"><a href="#race" data-tab="race">Race</a><a href="#rules" data-tab="rules">Rules</a></nav></header>
+<div id="race-view">
+<div class="controls">
+  <div class="search-box"><input class="input" id="add-input" placeholder="Add: SteamID64, profile URL, or name" autocomplete="off" /><div id="suggest"></div></div>
+  <button class="btn" id="add-btn">+ Add player</button>
+  <input class="input" id="filter" placeholder="Filter players..." style="width:180px" />
+  <label class="muted">Race start <input class="input" id="start" type="date" style="width:160px" /></label>
+  <button class="btn" id="refresh-btn">Refresh now</button>
+  <span class="muted" id="refresh-info"></span>
+</div>
+<div id="status"></div>
+<div class="table-wrap"><table>
+  <thead><tr>
+    <th>#</th><th>Player</th>
+    <th class="sortable" data-sort="badge">Rank</th>
+    <th class="sortable sorted" data-sort="gained">Progress since start</th>
+    <th class="sortable" data-sort="wr">Ranked winrate</th>
+    <th>Top heroes (ranked)</th><th>Eligibility</th><th>Form</th><th></th>
+  </tr></thead>
+  <tbody id="race-body"></tbody>
+</table></div>
+</div>
+<div id="rules-view" hidden>
+<div class="rules">
+  <h2>Format</h2>
+  <p>Ladder system tournament for the next ranked split. Ladder ranking is individual.</p>
+  <h2>Ranking &amp; stats</h2>
+  <ul>
+    <li>Statlocker tracks overall performance + MVP</li>
+    <li>Tracked and deciding eventual placement: <b>Winrate</b> · <b>Games Played</b> · <b>Points Gained</b></li>
+    <li>So not just the most unemployed clown wins</li>
+  </ul>
+  <h2>Eligibility</h2>
+  <ul><li>Only casual / low rank. High elo is allowed, but just to mog, not for prizes, and not allowed to duo/boost low.</li></ul>
+  <p class="sub-h">Requirements</p>
+  <ul>
+    <li>Never ranked / below old Oracle 6 and not an OTP / very washed / below Ritualist 6 (new rank)</li>
+    <li>Minimum 3 characters unlocked</li>
+    <li>Max 67.67% playrate on one character (no OTPs)</li>
+  </ul>
+  <h2>Duo rules</h2>
+  <ul>
+    <li>Duoing allowed within 6 ranks of each other (example: Mystic 1 can duo with Ritualist 1 at most)</li>
+    <li>Ladder ranking stays individual</li>
+    <li>Exception: if you duo 67.67%+ of your games with the same person, you get placed together and split the prize pool</li>
+  </ul>
+  <h2>Coaching</h2>
+  <p>HEROES / WHIZ / CAL / HASH / DOWN will host classes &amp; seminars beforehand for anyone who wants to learn.</p>
+  <h2>Prize structure</h2>
+  <table>
+    <tr><td>10+ participants</td><td>Top 3 paid</td></tr>
+    <tr><td>15+ participants</td><td>Top 4 paid</td></tr>
+    <tr><td>20+ participants</td><td>Top 5 paid</td></tr>
+    <tr><td>And so on…</td><td></td></tr>
+  </table>
+  <h2>Duration</h2>
+  <p style="text-align:center">TBD, currently planned for around 3 weeks.</p>
+</div>
+</div>
+<div class="footer">Friends climb tracker · Data from deadlock-api.com · Progress = sum of <code>ranked_delta</code> over ranked matches since race start</div>
+
+<script>
+"use strict";
+const API = "https://api.deadlock-api.com";
+const MATCH_MODE_RANKED = 4;          // ASSUMPTION: enum order matches the documented list (unranked=1 ... ranked=4). Verify on real data.
+const FAST_MS = 5 * 60 * 1000;        // rank / steam / hero stats (batched calls)
+const HISTORY_MS = 15 * 60 * 1000;    // match-history is rate limited for bot-friend accounts (10 req/h per IP)
+const DEFAULT_PLAYERS = [147271596, 1092139390, 916636876, 146738314, 165563493];
+const MIN_HEROES = 3;                  // rule: minimum 3 characters
+const MAX_ONE_HERO_SHARE = 0.6767;     // rule: max 67.67% playrate on one character
+const ELIGIBILITY_MIN_GAMES = 10;      // my choice, not in the rules: below this, a failed check shows amber ("too early") instead of red
+const STEAM64_BASE = 76561197960265728n;
+
+const state = { ids: [], start: 0, sort: "gained", filter: "", ranks: {}, heroes: {},
+                rank: new Map(), steam: new Map(), heroStats: new Map(), hist: new Map(), errors: new Map(), lastFast: 0 };
+
+/* ---------- helpers ---------- */
+function h(tag, props = {}, ...kids) {           // DOM builder: textContent only, never innerHTML
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === "class") el.className = v; else if (k === "text") el.textContent = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v); else el.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) if (kid != null) el.append(kid);
+  return el;
+}
+const safeUrl = u => { try { const x = new URL(u); return x.protocol === "https:" ? x.href : ""; } catch { return ""; } };
+function img(cls, src, alt, fallbackText, altSrc) {
+  const box = h("div", { class: cls, text: fallbackText || "?" });
+  const first = safeUrl(src) || safeUrl(altSrc);
+  if (!first) return box;
+  const el = h("img", { class: cls, src: first, alt: alt || "", loading: "lazy" });
+  let retried = first !== safeUrl(src);          // already on the fallback URL
+  el.addEventListener("error", () => {
+    const next = safeUrl(altSrc);
+    if (!retried && next) { retried = true; el.src = next; } else el.replaceWith(box);
+  });
+  return el;
+}
+async function api(path, params = {}) {
+  const url = new URL(API + path);
+  for (const [k, v] of Object.entries(params)) if (v != null) url.searchParams.set(k, Array.isArray(v) ? v.join(",") : v);
+  const r = await fetch(url);
+  if (!r.ok) { const e = new Error(`${r.status} ${path}`); e.status = r.status; e.retryAfter = r.headers.get("Retry-After"); throw e; }
+  return r.json();
+}
+function setStatus(msg) { const s = document.getElementById("status"); s.textContent = msg || ""; s.style.display = msg ? "block" : "none"; }
+function describe(e) {
+  if (e.status === 503) return `API busy, retry in ${e.retryAfter || "?"}s (${e.message})`;
+  if (e.status === 429) return `Rate limited (${e.message})`;
+  if (e instanceof TypeError) return `Request blocked or offline (CORS or network): ${e.message}`;
+  return e.message;
+}
+const dayStart = ms => { const d = new Date(ms); d.setHours(0, 0, 0, 0); return Math.floor(d / 1000); };   // local midnight
+const toDateInput = ts => { const d = new Date(ts * 1000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+
+/* ---------- URL state: ?players=a,b,c&start=unix ---------- */
+function loadUrl() {
+  const q = new URLSearchParams(location.search);
+  const ids = (q.get("players") || "").split(",").map(Number).filter(n => Number.isInteger(n) && n > 0);
+  state.ids = ids.length ? [...new Set(ids)] : DEFAULT_PLAYERS.slice();
+  const s = Number(q.get("start"));
+  state.start = dayStart(Number.isFinite(s) && s > 0 ? s * 1000 : Date.now() - 7 * 86400000);
+}
+function saveUrl() {
+  const q = new URLSearchParams({ players: state.ids.join(","), start: String(state.start) });
+  history.replaceState(null, "", "?" + q + location.hash);   // keep #rules / #race
+}
+
+/* ---------- data layer ---------- */
+async function loadAssets() {
+  const [ranks, heroes] = await Promise.all([api("/v1/assets/ranks"), api("/v1/assets/heroes")]);
+  state.ranks = Object.fromEntries(ranks.map(r => [r.tier, r]));
+  state.heroes = Object.fromEntries(heroes.map(x => [x.id, x]));
+}
+async function refreshFast() {
+  const ids = state.ids; if (!ids.length) return;
+  const jobs = {
+    rank: api("/v1/players/rank", { account_ids: ids }),
+    steam: api("/v1/players/steam", { account_ids: ids }),
+    hero: api("/v1/players/hero-stats", { account_ids: ids, match_mode: "ranked", min_unix_timestamp: state.start }),
+  };
+  const [rk, st, hs] = await Promise.allSettled(Object.values(jobs));
+  const note = (key, r) => { if (r.status === "rejected") state.errors.set(key, describe(r.reason)); else state.errors.delete(key); };
+  note("rank", rk); note("steam", st); note("hero-stats", hs);
+  if (rk.status === "fulfilled") for (const r of rk.value) state.rank.set(r.account_id, r);
+  if (st.status === "fulfilled") for (const p of st.value) state.steam.set(p.account_id, p);
+  if (hs.status === "fulfilled") {
+    state.heroStats = new Map(ids.map(id => [id, []]));
+    for (const row of hs.value) state.heroStats.get(row.account_id)?.push(row);
+  }
+  state.lastFast = Date.now();
+}
+function summarize(entries) {
+  const ranked = entries.filter(m => m.match_mode === MATCH_MODE_RANKED).sort((a, b) => b.start_time - a.start_time);
+  const inRace = ranked.filter(m => m.start_time >= state.start);
+  const scored = inRace.filter(m => m.player_match_outcome === 1 || m.player_match_outcome === 2);
+  const wins = scored.filter(m => m.player_match_outcome === 1).length;
+  let streak = 0; const first = ranked[0]?.player_match_outcome;
+  for (const m of ranked) { if (m.player_match_outcome === first) streak++; else break; }
+  const badges = ranked.map(m => m.ranked_display_badge).filter(b => b > 0);
+  return {
+    gained: inRace.reduce((s, m) => s + (m.ranked_delta ?? 0), 0),
+    games: scored.length, wins,
+    streak: first === 1 ? `W${streak}` : first === 2 ? `L${streak}` : "",
+    lastRanked: ranked[0]?.start_time ?? null,
+    peak: badges.length ? Math.max(...badges) : 0,
+    oldest: entries.length ? Math.min(...entries.map(m => m.start_time)) : null,
+  };
+}
+async function refreshHistory() {
+  const ids = state.ids.slice();
+  await Promise.all(ids.map(async id => {
+    try { state.hist.set(id, summarize(await api(`/v1/players/${id}/match-history`))); state.errors.delete("history " + id); }
+    catch (e) { state.errors.set("history " + id, describe(e)); }   // keep last good data
+  }));
+}
+async function refreshAll(withHistory = true) {
+  try { await Promise.all([refreshFast(), withHistory ? refreshHistory() : null]); } finally { render(); }
+}
+
+/* ---------- add player ---------- */
+function parseInput(raw) {
+  const s = raw.trim();
+  let m = s.match(/steamcommunity\.com\/profiles\/(\d{17})/) || s.match(/^(\d{17})$/);
+  if (m) return { id: Number(BigInt(m[1]) - STEAM64_BASE) };   // BigInt: SteamID64 exceeds 2^53
+  if (/^\d{1,10}$/.test(s)) return { id: Number(s) };
+  m = s.match(/steamcommunity\.com\/id\/([^/?#]+)/);
+  return { query: m ? m[1] : s };
+}
+let suggestions = [], suggestSeq = 0, suggestTimer, selIdx = -1;
+function closeSuggest() { suggestions = []; selIdx = -1; const el = document.getElementById("suggest"); el.style.display = "none"; el.replaceChildren(); }
+function renderSuggest(list, emptyMsg) {
+  const el = document.getElementById("suggest");
+  suggestions = list; selIdx = list.length ? 0 : -1;
+  el.replaceChildren(...(list.length
+    ? list.map((f, i) => h("button", { class: "sg" + (i === 0 ? " sel" : ""), onclick: () => pick(f) },
+        img("avatar", f.avatarmedium, f.personaname, f.personaname?.[0]?.toUpperCase()),
+        h("div", {}, h("div", { class: "player-name", text: f.personaname }), h("div", { class: "player-id", text: String(f.account_id) }))))
+    : [h("div", { class: "sg-empty", text: emptyMsg })]));
+  el.style.display = "block";
+}
+function pick(f) { state.steam.set(f.account_id, f); commitAdd(f.account_id); }
+async function showSuggestions(q) {
+  const seq = ++suggestSeq, p = parseInput(q);
+  try {
+    let found = p.id ? await api("/v1/players/steam", { account_ids: [p.id] })
+                     : await api("/v1/players/steam-search", { search_query: p.query, limit: 6, min_matches_played_last_30d: 0 });
+    if (seq !== suggestSeq) return;                              // a newer keystroke superseded this request
+    if (p.id && !found.length) found = [{ account_id: p.id, personaname: `Account ${p.id}` }];
+    renderSuggest(found, `No profile found for "${p.query}". Vanity URLs can't be resolved; search by in-game name or paste a /profiles/ URL.`);
+  } catch (e) { if (seq === suggestSeq) renderSuggest([], "Search failed: " + describe(e)); }
+}
+function onAddInput() {
+  clearTimeout(suggestTimer);
+  const q = document.getElementById("add-input").value.trim();
+  if (q.length < 2) { suggestSeq++; return closeSuggest(); }
+  suggestTimer = setTimeout(() => showSuggestions(q), 250);
+}
+function moveSel(d) {
+  if (!suggestions.length) return;
+  selIdx = (selIdx + d + suggestions.length) % suggestions.length;
+  document.querySelectorAll("#suggest .sg").forEach((b, i) => b.classList.toggle("sel", i === selIdx));
+}
+async function addPlayer() {
+  const q = document.getElementById("add-input").value.trim(); if (!q) return;
+  const p = parseInput(q); if (p.id) return commitAdd(p.id);
+  if (!suggestions.length) await showSuggestions(q);
+  if (suggestions[selIdx]) pick(suggestions[selIdx]);
+}
+function commitAdd(id) {
+  closeSuggest();
+  document.getElementById("add-input").value = "";
+  if (!state.ids.includes(id)) state.ids.push(id);
+  saveUrl(); refreshAll();
+}
+function removePlayer(id) { state.ids = state.ids.filter(x => x !== id); saveUrl(); render(); }
+
+/* ---------- render ---------- */
+function rows() {
+  const f = state.filter.toLowerCase();
+  const list = state.ids.map(id => {
+    const hi = state.hist.get(id), rk = state.rank.get(id), st = state.steam.get(id);
+    return { id, hi, st, badge: rk?.badge ?? 0, name: st?.personaname ?? String(id),
+             wr: hi && hi.games ? hi.wins / hi.games : -1, gained: hi?.gained ?? -Infinity };
+  }).filter(r => !f || r.name.toLowerCase().includes(f));
+  return list.sort((a, b) => b[state.sort] - a[state.sort] || b.badge - a.badge);
+}
+function chip(status, text, title) { return h("span", { class: "chip " + status, text, title }); }
+function eligibility(r) {
+  const rows = (state.heroStats.get(r.id) || []).filter(x => x.matches_played > 0);
+  const total = rows.reduce((s, x) => s + x.matches_played, 0);
+  if (!total) return h("span", { class: "muted", text: "no ranked games" });
+  const early = total < ELIGIBILITY_MIN_GAMES, fail = early ? "warn" : "bad";
+  const topRow = rows.reduce((a, b) => (b.matches_played > a.matches_played ? b : a));
+  const share = topRow.matches_played / total, hero = state.heroes[topRow.hero_id]?.name || `Hero ${topRow.hero_id}`;
+  return [
+    chip(rows.length >= MIN_HEROES ? "ok" : fail, `${rows.length}/${MIN_HEROES}+ heroes`,
+         `Heroes with a ranked game since race start. Unlock status isn't exposed by the endpoints used, so this counts heroes played. ${total} games.`),
+    chip(share <= MAX_ONE_HERO_SHARE ? "ok" : fail, `${hero} ${(share * 100).toFixed(1)}%`,
+         `Share of ranked games on the most played hero (cap ${(MAX_ONE_HERO_SHARE * 100).toFixed(2)}%), ${topRow.matches_played} of ${total} games.` + (early ? ` Fewer than ${ELIGIBILITY_MIN_GAMES} games: provisional.` : "")),
+  ];
+}
+function rankCell(r) {
+  const tier = Math.floor(r.badge / 10), sub = r.badge % 10, info = state.ranks[tier];
+  const src = tier > 0 ? `${API}/v1/assets/ranks/${tier}/${sub}/image?format=webp` : "";
+  const fb = info?.images?.large_webp || info?.images?.large || "";
+  const image = img("rank-img", src, info?.name || "", String(tier || "—"), fb);
+  const peakTier = Math.floor((r.hi?.peak || 0) / 10);
+  return h("div", { class: "rank-badge" }, image, h("div", {},
+    h("div", { class: "badge-name", text: tier > 0 ? `${info?.name ?? "Tier " + tier} ${sub}` : (info?.name ?? "Unranked") }),
+    r.hi?.peak ? h("div", { class: "peak", text: `Peak in history: ${state.ranks[peakTier]?.name ?? peakTier} ${r.hi.peak % 10}` }) : null));
+}
+function render() {
+  const body = document.getElementById("race-body");
+  body.replaceChildren(...rows().map((r, i) => {
+    const hi = r.hi, g = hi?.gained;
+    const hs = (state.heroStats.get(r.id) || []).slice().sort((a, b) => b.matches_played - a.matches_played).slice(0, 3);
+    const total = (state.heroStats.get(r.id) || []).reduce((s, x) => s + x.matches_played, 0);
+    const err = [...state.errors].filter(([k]) => k === "history " + r.id).map(([, v]) => v)[0];
+    const ci = hi?.games ? Math.round(196 * Math.sqrt(0.25 / hi.games)) : null;
+    return h("tr", { class: i < 3 ? `top-${i + 1}` : "" },
+      h("td", {}, h("div", { class: "rank-num", text: String(i + 1) })),
+      h("td", {}, h("div", { class: "player-cell" },
+        img("avatar", r.st?.avatarmedium, r.name, r.name[0]?.toUpperCase()),
+        h("div", {}, h("div", { class: "player-name", text: r.name }), h("div", { class: "player-id", text: String(r.id) })))),
+      h("td", {}, rankCell(r)),
+      h("td", {}, hi
+        ? [h("div", { class: "gain " + (g > 0 ? "up" : g < 0 ? "down" : "flat"), text: g > 0 ? `▲ ${g}` : g < 0 ? `▼ ${-g}` : "—" }),
+           h("div", { class: "sub", text: `${hi.games} ranked games` })]
+        : h("span", { class: "muted", text: err ? "unavailable" : "loading…", title: err || "" })),
+      h("td", {}, hi?.games
+        ? [h("div", { text: `${Math.round(r.wr * 100)}%`, title: `${hi.wins}W ${hi.games - hi.wins}L, ±${ci} pts (95%)` }),
+           h("div", { class: "sub", text: `${hi.wins}W ${hi.games - hi.wins}L` }),
+           h("div", { class: "wr-bar" }, h("div", { class: "wr-fill", style: `width:${r.wr * 100}%` }))]
+        : h("span", { class: "muted", text: "—" })),
+      h("td", {}, h("div", { class: "heroes" }, hs.map(x => h("div", { class: "hero-slot", title: state.heroes[x.hero_id]?.name || `Hero ${x.hero_id}` },
+        img("hero-icon", state.heroes[x.hero_id]?.images?.icon_hero_card_webp || state.heroes[x.hero_id]?.images?.icon_hero_card, state.heroes[x.hero_id]?.name),
+        h("div", { class: "hero-pct", text: total ? `${Math.round(100 * x.matches_played / total)}%` : "" }))))),
+      h("td", {}, eligibility(r)),
+      h("td", {}, hi ? [h("div", { text: hi.streak || "—" }),
+        h("div", { class: "sub", text: hi.lastRanked ? new Date(hi.lastRanked * 1000).toLocaleDateString() : "no ranked games" })] : null),
+      h("td", {}, h("a", { class: "statlocker-btn", href: `https://statlocker.gg/profile/${r.id}`, target: "_blank", rel: "noopener" }, "STATLOCKER"),
+        h("button", { class: "x", title: "Remove", onclick: () => removePlayer(r.id) }, "✕")));
+  }));
+  document.querySelectorAll("th.sortable").forEach(th => th.classList.toggle("sorted", th.dataset.sort === state.sort));
+  const errs = [...state.errors].map(([k, v]) => `${k}: ${v}`);
+  setStatus(errs.length ? errs.join(" | ") : "");
+}
+
+/* ---------- audio ---------- */
+function setupAudio() {
+  const v = document.querySelector("#bg video"), btn = document.getElementById("mute"), vol = document.getElementById("vol");
+  const saved = { volume: 0.3, muted: false };
+  try { Object.assign(saved, JSON.parse(localStorage.getItem("audio") || "{}")); } catch {}
+  v.volume = saved.volume; vol.value = saved.volume;
+  const play = () => { try { const p = v.play(); p && p.catch && p.catch(() => {}); } catch {} };
+  const store = () => { try { localStorage.setItem("audio", JSON.stringify({ volume: v.volume, muted: v.muted })); } catch {} };
+  const paint = () => { btn.textContent = v.muted || v.volume === 0 ? "🔇" : v.volume < 0.5 ? "🔈" : "🔊"; };
+  // Browsers block sound until the page gets a gesture, so the video starts muted and unmutes on the first click/key.
+  let unlocked = false;
+  const unlock = e => {
+    if (unlocked || e.target.closest("#audio")) return;
+    unlocked = true;
+    if (!saved.muted) { v.muted = false; play(); paint(); }
+  };
+  ["pointerdown", "keydown"].forEach(t => document.addEventListener(t, unlock, true));
+  btn.addEventListener("click", () => {
+    unlocked = true; v.muted = !v.muted;
+    if (!v.muted && v.volume === 0) { v.volume = 0.3; vol.value = 0.3; }
+    play(); paint(); store();
+  });
+  vol.addEventListener("input", () => { unlocked = true; v.volume = Number(vol.value); v.muted = v.volume === 0; play(); paint(); store(); });
+  paint();
+}
+
+/* ---------- boot ---------- */
+async function main() {
+  loadUrl(); saveUrl(); setupAudio();
+  const startEl = document.getElementById("start"); startEl.value = toDateInput(state.start);
+  startEl.addEventListener("change", () => {            // "YYYY-MM-DD" parsed as LOCAL midnight (Date.parse would use UTC)
+    const [y, m, d] = startEl.value.split("-").map(Number);
+    if (y) { state.start = dayStart(new Date(y, m - 1, d)); saveUrl(); refreshAll(); }
+  });
+  document.getElementById("add-btn").addEventListener("click", addPlayer);
+  const addEl = document.getElementById("add-input");
+  addEl.addEventListener("input", onAddInput);
+  addEl.addEventListener("keydown", e => {
+    if (e.key === "Enter") addPlayer();
+    else if (e.key === "ArrowDown") { e.preventDefault(); moveSel(1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); moveSel(-1); }
+    else if (e.key === "Escape") closeSuggest();
+  });
+  document.addEventListener("click", e => { if (!e.target.closest(".search-box")) closeSuggest(); });
+  const route = () => {
+    const rules = location.hash === "#rules";
+    document.getElementById("race-view").hidden = rules; document.getElementById("rules-view").hidden = !rules;
+    document.querySelectorAll(".tabs a").forEach(a => a.classList.toggle("active", (a.dataset.tab === "rules") === rules));
+  };
+  window.addEventListener("hashchange", route); route();
+  document.getElementById("filter").addEventListener("input", e => { state.filter = e.target.value; render(); });
+  document.getElementById("refresh-btn").addEventListener("click", () => refreshAll());
+  document.querySelectorAll("th.sortable").forEach(th => th.addEventListener("click", () => { state.sort = th.dataset.sort; render(); }));
+  try { await loadAssets(); } catch (e) { state.errors.set("assets", describe(e)); }
+  await refreshAll();
+  setInterval(() => refreshAll(false), FAST_MS);
+  setInterval(refreshHistory, HISTORY_MS);
+  setInterval(() => {
+    const left = Math.max(0, Math.round((state.lastFast + FAST_MS - Date.now()) / 1000));
+    document.getElementById("refresh-info").textContent = state.lastFast ? `Fetched ${new Date(state.lastFast).toLocaleTimeString()} · next in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : "";
+  }, 1000);
+}
+main();
+</script>
+</body>
+</html>
