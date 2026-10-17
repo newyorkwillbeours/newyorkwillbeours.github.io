@@ -151,7 +151,7 @@ if (location.search) {
 </div>
 <div class="footer">Friends climb tracker · Data from deadlock-api.com · Progress = sum of <code>ranked_delta</code> over ranked matches since race start</div>
 
-<script src="backend-config.js"></script>
+<script src="backend-config.js?v=2"></script>
 <script src="vendor/convex.js"></script>
 <script>
 "use strict";
@@ -159,7 +159,6 @@ const API = "https://api.deadlock-api.com";
 const MATCH_MODE_RANKED = 4;          // ASSUMPTION: enum order matches the documented list (unranked=1 ... ranked=4). Verify on real data.
 const FAST_MS = 5 * 60 * 1000;        // rank / steam / hero stats (batched calls)
 const HISTORY_MS = 15 * 60 * 1000;    // match-history is rate limited for bot-friend accounts (10 req/h per IP)
-const DEFAULT_PLAYERS = [147271596, 1092139390, 916636876, 146738314, 165563493];
 const MIN_HEROES = 3;                  // rule: minimum 3 characters
 const MAX_ONE_HERO_SHARE = 0.6767;     // rule: max 67.67% playrate on one character
 const ELIGIBILITY_MIN_GAMES = 10;      // my choice, not in the rules: below this, a failed check shows amber ("too early") instead of red
@@ -168,14 +167,15 @@ const STEAM64_BASE = 76561197960265728n;
 const state = { ids: [], start: 0, sort: "gained", filter: "", ranks: {}, heroes: {},
                 rank: new Map(), steam: new Map(), heroStats: new Map(), hist: new Map(), errors: new Map(), lastFast: 0 };
 
-const cloud = { client: null, ready: false, key: "", revision: 0, saving: false };
+const cloud = { client: null, ready: false, key: "", revision: 0, saving: false, notice: "" };
 function paintCloud() {
-  const enabled = !cloud.client || (cloud.ready && !!cloud.key && !cloud.saving);
-  ["add-input", "add-btn", "start"].forEach(id => document.getElementById(id).disabled = !enabled);
-  document.getElementById("sync-info").textContent = !cloud.client ? "Personal view" : !cloud.ready ? "Connecting to shared race…" : cloud.saving ? "Saving…" : cloud.key ? "Shared race · organizer" : "Shared race · view only";
+  // Typing is always available; saving waits for the shared race connection.
+  document.getElementById("add-input").disabled = cloud.saving;
+  document.getElementById("add-btn").disabled = !cloud.ready || cloud.saving;
+  document.getElementById("start").disabled = !cloud.ready || !cloud.key || cloud.saving;
+  document.getElementById("sync-info").textContent = cloud.saving ? "Saving to shared race…" : !cloud.ready ? "Connecting to shared race…" : cloud.notice || (cloud.key ? "Shared race · organizer" : "Shared race · anyone can join");
 }
 async function saveRace(players, start) {
-  if (!cloud.client) { state.ids = players; state.start = start; render(); return true; }
   if (!cloud.ready || !cloud.key || cloud.saving) return false;
   cloud.saving = true; paintCloud();
   try {
@@ -188,7 +188,7 @@ async function saveRace(players, start) {
 }
 function setupCloud() {
   const url = window.RACE_CONVEX_URL;
-  if (!url) return paintCloud();
+  if (!url) { state.errors.set("sync", "Shared race configuration is missing. Nothing can be saved."); render(); return; }
   // A configured shared race must never silently fall back to editable local data.
   cloud.client = { mutation: async () => { throw new Error("Backend unavailable"); } };
   const button = document.getElementById("organizer-btn"); button.hidden = false;
@@ -200,16 +200,19 @@ function setupCloud() {
   paintCloud();
   try {
     cloud.client = new convex.ConvexClient(url);
-    cloud.client.onUpdate("race:get", {}, race => {
-      if (!race) { state.errors.set("sync", "Shared race has not been initialized."); render(); return; }
-      const changed = !cloud.ready || race.start !== state.start || race.players.join(",") !== state.ids.join(",");
-      cloud.ready = true; cloud.revision = race.revision;
-      state.ids = race.players; state.start = race.start;
-      document.getElementById("start").value = toDateInput(state.start);
-      state.errors.delete("sync"); render();
-      if (changed) { state.hist.clear(); state.heroStats.clear(); refreshAll(); }
-    }, e => { cloud.ready = false; state.errors.set("sync", e.message); render(); });
+    cloud.client.onUpdate("race:get", {}, applyRace, e => { cloud.ready = false; state.errors.set("sync", e.message); render(); });
   } catch (e) { state.errors.set("sync", e.message); render(); }
+}
+function applyRace(race) {
+  if (!race) { cloud.ready = false; state.errors.set("sync", "Shared race has not been initialized."); render(); return; }
+  if (cloud.ready && race.revision < cloud.revision) return;
+  const changed = !cloud.ready || race.start !== state.start || race.players.join(",") !== state.ids.join(",");
+  cloud.ready = true; cloud.revision = race.revision;
+  state.ids = race.players; state.start = race.start;
+  document.getElementById("start").value = toDateInput(state.start);
+  state.errors.delete("sync");
+  if (changed) { state.hist.clear(); state.heroStats.clear(); refreshAll(); }
+  render();
 }
 
 /* ---------- helpers ---------- */
@@ -254,7 +257,7 @@ const toDateInput = ts => { const d = new Date(ts * 1000); return `${d.getFullYe
 
 /* ---------- shared race state comes from Convex ---------- */
 function initializeView() {
-  state.ids = window.RACE_CONVEX_URL ? [] : DEFAULT_PLAYERS.slice();
+  state.ids = [];
   state.start = dayStart(Date.now() - 7 * 86400000);
 }
 
@@ -360,10 +363,20 @@ async function addPlayer() {
   if (suggestions[selIdx]) pick(suggestions[selIdx]);
 }
 async function commitAdd(id) {
-  closeSuggest();
-  document.getElementById("add-input").value = "";
-  if (!state.ids.includes(id) && await saveRace([...state.ids, id], state.start)) {
-    if (!cloud.client) refreshAll();
+  if (!cloud.ready || !cloud.client) { state.errors.set("sync", "Wait for the shared race to connect, then try again."); render(); return; }
+  if (cloud.saving) return;
+  cloud.saving = true; cloud.notice = ""; paintCloud();
+  try {
+    const result = await cloud.client.mutation("race:addPlayer", { accountId: id });
+    applyRace(result);
+    closeSuggest();
+    document.getElementById("add-input").value = "";
+    cloud.notice = "Player saved to shared race";
+    state.errors.delete("sync");
+  } catch (e) {
+    state.errors.set("sync", e.data || e.message);
+  } finally {
+    cloud.saving = false; render();
   }
 }
 
@@ -472,7 +485,7 @@ async function main() {
   startEl.addEventListener("change", async () => {            // "YYYY-MM-DD" parsed as LOCAL midnight (Date.parse would use UTC)
     const [y, m, d] = startEl.value.split("-").map(Number);
     if (y && await saveRace(state.ids, dayStart(new Date(y, m - 1, d)))) {
-      if (!cloud.client) refreshAll();
+      cloud.notice = "Race start saved";
     }
   });
   document.getElementById("add-btn").addEventListener("click", addPlayer);

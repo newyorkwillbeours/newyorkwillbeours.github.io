@@ -14,6 +14,27 @@ export const get = query({
   },
 });
 
+// Joining the race is public. This mutation only appends; it cannot remove
+// existing accounts or change the organizer's start date.
+export const addPlayer = mutation({
+  args: { accountId: v.number() },
+  returns: race,
+  handler: async (ctx, { accountId }) => {
+    if (!Number.isInteger(accountId) || accountId < 1 || accountId > 4294967295) {
+      throw new ConvexError("Enter a valid Steam account ID or SteamID64.");
+    }
+    const row = await ctx.db.query("races").withIndex("by_name", q => q.eq("name", "main")).unique();
+    if (!row) throw new ConvexError("The shared race has not been initialized.");
+    if (row.players.includes(accountId)) {
+      return { players: row.players, start: row.start, revision: row.revision };
+    }
+    if (row.players.length >= 100) throw new ConvexError("The race is full. Contact an organizer.");
+    const result = { players: [...row.players, accountId], start: row.start, revision: row.revision + 1 };
+    await ctx.db.patch(row._id, result);
+    return result;
+  },
+});
+
 export const update = mutation({
   args: { key: v.string(), players: v.array(v.number()), start: v.number(), revision: v.number() },
   returns: v.null(),
