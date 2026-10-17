@@ -75,7 +75,6 @@
   .hero-pct{font-size:.7rem;color:var(--muted)}
   a.statlocker-btn{border:1px solid #5b6abf;color:#8b9bff;padding:5px 12px;border-radius:5px;font-size:.75rem;text-decoration:none;white-space:nowrap}
   a.statlocker-btn:hover{background:#5b6abf22}
-  .x{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;padding:4px 8px}.x:hover{color:var(--red)}
   .footer{margin-top:20px;font-size:.85rem;color:var(--muted);text-align:center}
 </style>
 </head>
@@ -91,6 +90,8 @@
   <input class="input" id="filter" placeholder="Filter players..." style="width:180px" />
   <label class="muted">Race start <input class="input" id="start" type="date" style="width:160px" /></label>
   <button class="btn" id="refresh-btn">Refresh now</button>
+  <button class="btn" id="organizer-btn" hidden>Organizer access</button>
+  <span class="muted" id="sync-info" role="status"></span>
   <span class="muted" id="refresh-info"></span>
 </div>
 <div id="status"></div>
@@ -144,6 +145,8 @@
 </div>
 <div class="footer">Friends climb tracker · Data from deadlock-api.com · Progress = sum of <code>ranked_delta</code> over ranked matches since race start</div>
 
+<script src="backend-config.js"></script>
+<script src="vendor/convex.js"></script>
 <script>
 "use strict";
 const API = "https://api.deadlock-api.com";
@@ -158,6 +161,50 @@ const STEAM64_BASE = 76561197960265728n;
 
 const state = { ids: [], start: 0, sort: "gained", filter: "", ranks: {}, heroes: {},
                 rank: new Map(), steam: new Map(), heroStats: new Map(), hist: new Map(), errors: new Map(), lastFast: 0 };
+
+const cloud = { client: null, ready: false, key: "", revision: 0, saving: false };
+function paintCloud() {
+  const enabled = !cloud.client || (cloud.ready && !!cloud.key && !cloud.saving);
+  ["add-input", "add-btn", "start"].forEach(id => document.getElementById(id).disabled = !enabled);
+  document.getElementById("sync-info").textContent = !cloud.client ? "Personal view" : !cloud.ready ? "Connecting to shared race…" : cloud.saving ? "Saving…" : cloud.key ? "Shared race · organizer" : "Shared race · view only";
+}
+async function saveRace(players, start) {
+  if (!cloud.client) { state.ids = players; state.start = start; render(); return true; }
+  if (!cloud.ready || !cloud.key || cloud.saving) return false;
+  cloud.saving = true; paintCloud();
+  try {
+    await cloud.client.mutation("race:update", { key: cloud.key, players, start, revision: cloud.revision });
+    state.errors.delete("sync");
+    return true;
+  } catch (e) {
+    state.errors.set("sync", e.data || e.message); return false;
+  } finally { cloud.saving = false; document.getElementById("start").value = toDateInput(state.start); render(); }
+}
+function setupCloud() {
+  const url = window.RACE_CONVEX_URL;
+  if (!url) return paintCloud();
+  // A configured shared race must never silently fall back to editable local data.
+  cloud.client = { mutation: async () => { throw new Error("Backend unavailable"); } };
+  const button = document.getElementById("organizer-btn"); button.hidden = false;
+  button.addEventListener("click", () => {
+    if (cloud.key) { cloud.key = ""; button.textContent = "Organizer access"; }
+    else { cloud.key = prompt("Enter the organizer key to edit this race:") || ""; button.textContent = cloud.key ? "Lock editing" : "Organizer access"; }
+    paintCloud();
+  });
+  paintCloud();
+  try {
+    cloud.client = new convex.ConvexClient(url);
+    cloud.client.onUpdate("race:get", {}, race => {
+      if (!race) { state.errors.set("sync", "Shared race has not been initialized."); render(); return; }
+      const changed = !cloud.ready || race.start !== state.start || race.players.join(",") !== state.ids.join(",");
+      cloud.ready = true; cloud.revision = race.revision;
+      state.ids = race.players; state.start = race.start;
+      document.getElementById("start").value = toDateInput(state.start);
+      state.errors.delete("sync"); render();
+      if (changed) { state.hist.clear(); state.heroStats.clear(); refreshAll(); }
+    }, e => { cloud.ready = false; state.errors.set("sync", e.message); render(); });
+  } catch (e) { state.errors.set("sync", e.message); render(); }
+}
 
 /* ---------- helpers ---------- */
 function h(tag, props = {}, ...kids) {           // DOM builder: textContent only, never innerHTML
@@ -199,17 +246,15 @@ function describe(e) {
 const dayStart = ms => { const d = new Date(ms); d.setHours(0, 0, 0, 0); return Math.floor(d / 1000); };   // local midnight
 const toDateInput = ts => { const d = new Date(ts * 1000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
-/* ---------- URL state: ?players=a,b,c&start=unix ---------- */
-function loadUrl() {
-  const q = new URLSearchParams(location.search);
-  const ids = (q.get("players") || "").split(",").map(Number).filter(n => Number.isInteger(n) && n > 0);
-  state.ids = ids.length ? [...new Set(ids)] : DEFAULT_PLAYERS.slice();
-  const s = Number(q.get("start"));
-  state.start = dayStart(Number.isFinite(s) && s > 0 ? s * 1000 : Date.now() - 7 * 86400000);
-}
-function saveUrl() {
-  const q = new URLSearchParams({ players: state.ids.join(","), start: String(state.start) });
-  history.replaceState(null, "", "?" + q + location.hash);   // keep #rules / #race
+/* ---------- shared race state comes from Convex ---------- */
+function initializeView() {
+  state.ids = window.RACE_CONVEX_URL ? [] : DEFAULT_PLAYERS.slice();
+  state.start = dayStart(Date.now() - 7 * 86400000);
+  // Clean old bookmarks without allowing them to override the shared race.
+  const url = new URL(location.href);
+  url.searchParams.delete("players");
+  url.searchParams.delete("start");
+  history.replaceState(null, "", url.pathname + url.search + url.hash);
 }
 
 /* ---------- data layer ---------- */
@@ -313,13 +358,13 @@ async function addPlayer() {
   if (!suggestions.length) await showSuggestions(q);
   if (suggestions[selIdx]) pick(suggestions[selIdx]);
 }
-function commitAdd(id) {
+async function commitAdd(id) {
   closeSuggest();
   document.getElementById("add-input").value = "";
-  if (!state.ids.includes(id)) state.ids.push(id);
-  saveUrl(); refreshAll();
+  if (!state.ids.includes(id) && await saveRace([...state.ids, id], state.start)) {
+    if (!cloud.client) refreshAll();
+  }
 }
-function removePlayer(id) { state.ids = state.ids.filter(x => x !== id); saveUrl(); render(); }
 
 /* ---------- render ---------- */
 function rows() {
@@ -385,12 +430,12 @@ function render() {
       h("td", {}, eligibility(r)),
       h("td", {}, hi ? [h("div", { text: hi.streak || "—" }),
         h("div", { class: "sub", text: hi.lastRanked ? new Date(hi.lastRanked * 1000).toLocaleDateString() : "no ranked games" })] : null),
-      h("td", {}, h("a", { class: "statlocker-btn", href: `https://statlocker.gg/profile/${r.id}`, target: "_blank", rel: "noopener" }, "STATLOCKER"),
-        h("button", { class: "x", title: "Remove", onclick: () => removePlayer(r.id) }, "✕")));
+      h("td", {}, h("a", { class: "statlocker-btn", href: `https://statlocker.gg/profile/${r.id}`, target: "_blank", rel: "noopener" }, "STATLOCKER")));
   }));
   document.querySelectorAll("th.sortable").forEach(th => th.classList.toggle("sorted", th.dataset.sort === state.sort));
   const errs = [...state.errors].map(([k, v]) => `${k}: ${v}`);
   setStatus(errs.length ? errs.join(" | ") : "");
+  paintCloud();
 }
 
 /* ---------- audio ---------- */
@@ -421,11 +466,13 @@ function setupAudio() {
 
 /* ---------- boot ---------- */
 async function main() {
-  loadUrl(); saveUrl(); setupAudio();
+  initializeView(); setupAudio();
   const startEl = document.getElementById("start"); startEl.value = toDateInput(state.start);
-  startEl.addEventListener("change", () => {            // "YYYY-MM-DD" parsed as LOCAL midnight (Date.parse would use UTC)
+  startEl.addEventListener("change", async () => {            // "YYYY-MM-DD" parsed as LOCAL midnight (Date.parse would use UTC)
     const [y, m, d] = startEl.value.split("-").map(Number);
-    if (y) { state.start = dayStart(new Date(y, m - 1, d)); saveUrl(); refreshAll(); }
+    if (y && await saveRace(state.ids, dayStart(new Date(y, m - 1, d)))) {
+      if (!cloud.client) refreshAll();
+    }
   });
   document.getElementById("add-btn").addEventListener("click", addPlayer);
   const addEl = document.getElementById("add-input");
@@ -446,10 +493,11 @@ async function main() {
   document.getElementById("filter").addEventListener("input", e => { state.filter = e.target.value; render(); });
   document.getElementById("refresh-btn").addEventListener("click", () => refreshAll());
   document.querySelectorAll("th.sortable").forEach(th => th.addEventListener("click", () => { state.sort = th.dataset.sort; render(); }));
+  setupCloud();
   try { await loadAssets(); } catch (e) { state.errors.set("assets", describe(e)); }
   await refreshAll();
   setInterval(() => refreshAll(false), FAST_MS);
-  setInterval(refreshHistory, HISTORY_MS);
+  setInterval(() => refreshHistory().then(render), HISTORY_MS);
   setInterval(() => {
     const left = Math.max(0, Math.round((state.lastFast + FAST_MS - Date.now()) / 1000));
     document.getElementById("refresh-info").textContent = state.lastFast ? `Fetched ${new Date(state.lastFast).toLocaleTimeString()} · next in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : "";

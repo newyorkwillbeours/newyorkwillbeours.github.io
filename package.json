@@ -1,0 +1,30 @@
+{
+  "name": "newyorkwillbeours.github.io",
+  "version": "1.0.0",
+  "description": "Static Deadlock race tracker with a Convex backend",
+  "scripts": {
+    "backend:dev": "convex dev",
+    "backend:deploy": "convex deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/newyorkwillbeours/newyorkwillbeours.github.io.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/newyorkwillbeours/newyorkwillbeours.github.io/issues"
+  },
+  "homepage": "https://github.com/newyorkwillbeours/newyorkwillbeours.github.io#readme",
+  "dependencies": {
+    "convex": "^1.47.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
+  },
+  "private": true
+}
