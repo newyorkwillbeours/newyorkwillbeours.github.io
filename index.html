@@ -2,6 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<script>
+// Normalize legacy race links before any assets or application code load.
+if (location.search) {
+  history.replaceState(null, "", location.pathname + location.hash);
+}
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>NEW YORK WILL BE OURS</title>
 <link rel="icon" type="image/png" href="favicon.png" />
@@ -82,7 +88,7 @@
 <div id="bg"><video src="mohammed_kareem.mp4" autoplay muted loop playsinline></video></div>
 <div id="audio"><button id="mute" title="Mute / unmute" aria-label="Mute or unmute">🔇</button><input id="vol" type="range" min="0" max="1" step="0.05" value="0.3" aria-label="Volume" /></div>
 <header class="hero"><h1>NEW YORK WILL BE OURS</h1><div class="rule-line"></div>
-<nav class="tabs"><a href="#race" data-tab="race">Race</a><a href="#rules" data-tab="rules">Rules</a></nav></header>
+<nav class="tabs"><a href="./#race" data-tab="race">Race</a><a href="./#rules" data-tab="rules">Rules</a></nav></header>
 <div id="race-view">
 <div class="controls">
   <div class="search-box"><input class="input" id="add-input" placeholder="Add: SteamID64, profile URL, or name" autocomplete="off" /><div id="suggest"></div></div>
@@ -250,11 +256,6 @@ const toDateInput = ts => { const d = new Date(ts * 1000); return `${d.getFullYe
 function initializeView() {
   state.ids = window.RACE_CONVEX_URL ? [] : DEFAULT_PLAYERS.slice();
   state.start = dayStart(Date.now() - 7 * 86400000);
-  // Clean old bookmarks without allowing them to override the shared race.
-  const url = new URL(location.href);
-  url.searchParams.delete("players");
-  url.searchParams.delete("start");
-  history.replaceState(null, "", url.pathname + url.search + url.hash);
 }
 
 /* ---------- data layer ---------- */
